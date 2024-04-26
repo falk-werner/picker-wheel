@@ -1,0 +1,312 @@
+<!doctype html>
+<html>
+<head>
+	<title>Wheel Picker</title>
+	<style type="text/css">
+	body {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+	}
+	
+	.wrapper {
+		width: 50%;
+	}
+	
+	.wheel_wrapper {
+		display: grid;
+		grid-template: 1fr / 1fr;
+		place-items:center;
+	}
+	
+	svg {
+		grid-column: 1 / 1;
+		grid-row: 1 / 1;
+	}
+	
+	</style>
+	<script type="text/javascript">
+	
+	function startup() {
+		const options = loadOptions();
+		initOptions(options);				
+		updateWheel(options);
+		
+		registerControls();
+	}
+	
+	function registerControls() {
+		const new_name = document.querySelector("#new_name");
+		new_name.addEventListener("keypress", (event) => {
+			if ((event.key == "Enter") && (new_name.value)) {
+				addNewOption();
+			}
+		});
+		
+		const new_color = document.querySelector("#new_color");
+		new_color.value = generateRandomColor();
+		
+		const add_new = document.querySelector("#add_new");
+		add_new.addEventListener("click", () => {
+			addNewOption();
+		});
+		
+		const spinner = document.querySelector("#spinner");
+		spinner.addEventListener("click", () => {
+			spin();
+		});
+	}
+
+	let rot = 0;
+	function spin() {
+		const options = collectOptions();
+		const count = Object.keys(options).length;
+		if (count < 2) { return; }
+		
+		const angle = 360 / count;
+		const target = Math.floor(Math.random() * count);
+		const target_deg = Math.floor((target * angle) % 360);
+		
+		const i = 0;
+		update_frame(i, target_deg);
+	}
+
+	function update_frame(i, target_deg) {
+		rot = (rot + 7.2 + (target_deg / 100)) % 360;
+		i += 1;
+		
+		const wheel = document.querySelector("#wheel");
+		wheel.style.transform = "rotate(" + rot + "deg)";
+		
+		if (i < 100) {
+			window.setTimeout(() => {
+				update_frame(i, target_deg);
+			}, 10);
+		}
+	}
+	
+	function addNewOption() {
+		const new_name = document.querySelector("#new_name");
+		const new_color = document.querySelector("#new_color");
+		
+		addOption(new_name.value, new_color.value);
+		updateView();
+		
+		new_name.value = "";
+		new_color.value = generateRandomColor();
+	}
+	
+	function generateRandomColor() {
+		let color = "#";
+		for(let i = 0; i < 3; i++) {
+			const a = 8 + Math.floor(Math.random() * 8);
+			color += a.toString(16);
+			const b = Math.floor(Math.random() * 16);
+			color += b.toString(16);
+		}
+	
+		return color;
+	}
+	
+	function loadOptions() {
+		return loadOptionsFromQueryString() || loadOptionsFromLocalStorage() || getDefaultOptions();
+	}
+		
+	function saveOptionsToQueryString(options) {
+		const url = new URL(window.location);
+		url.search = "";
+		
+		for(const [name, color] of Object.entries(options)) {
+			url.searchParams.set(name, color);			
+		}
+		
+		window.history.pushState({}, "", url);
+	}
+	
+	function loadOptionsFromQueryString() {
+		const options = {};
+
+		const queryString = window.location.search;
+		if (!queryString) { return null; }
+		
+		const params = new URLSearchParams(queryString);
+		for(const [name, color] of params) {
+			if (!isValidColor(color)) { return null; }
+			
+			options[name] = color;
+		}
+		
+		if (Object.keys(options).length < 2) { return null; }
+		return options;
+	}
+
+	function isValidColor(color) {
+		return color.match(/^#[0-9a-fA-F]{6}$/) != null;
+	}
+	
+	function saveOptionsToLocalStorage(options) {
+		const data = {
+			version: 1,
+			options: options
+		};
+		
+		localStorage.setItem("data", JSON.stringify(data));
+	}
+	
+	function loadOptionsFromLocalStorage() {
+		try {
+			const data = JSON.parse(localStorage.getItem("data"));
+			if (data.version != 1) { return null; }
+			if (Object.keys(data.options).length < 2) { return null; }
+			
+			return data.options;
+		}
+		catch (ex) {
+			return null;
+		}
+	}
+	
+	function getDefaultOptions() {
+		return {
+			"eat": "#33C4C7",
+			"sleep": "#FFC933"			
+		}
+	}
+	
+	function initOptions(options) {
+		const container = document.querySelector("#options");
+		container.innerHTML = "";
+		
+		for(const [name, color] of Object.entries(options)) {
+			void addOption(name, color);
+		}
+	}
+	
+	function addOption(name, color) {
+		const container = document.querySelector("#options");	
+		const element = document.createElement("div");			
+		container.appendChild(element);
+		
+		const name_edit = document.createElement("input");
+		element.appendChild(name_edit);
+		name_edit.type = "text";
+		name_edit.value = name;
+		name_edit.addEventListener("input", () => {
+			updateView();
+		});
+		
+		const color_edit = document.createElement("input");
+		element.appendChild(color_edit);
+		color_edit.type = "color";
+		color_edit.value = color;
+		color_edit.addEventListener("input", () => {
+			updateView();
+		});
+		
+		const remove_button = document.createElement("input");
+		element.appendChild(remove_button);
+		remove_button.type = "button";
+		remove_button.value = "Remove";
+		remove_button.addEventListener("click", () => {
+			element.remove();
+			updateView();
+		});
+
+	}
+	
+	function updateView() {
+		const options = collectOptions();
+		
+		if (Object.keys(options).length > 1) {
+			updateWheel(options);
+			saveOptionsToLocalStorage(options);
+			saveOptionsToQueryString(options);			
+		}
+	}
+	
+	function collectOptions() {
+		const options = {};
+		
+		const elements = document.querySelectorAll("#options > div");
+		for(let i = 0; i < elements.length; i++) {
+			const element = elements[i];
+			const name = element.querySelector("input[type=text]");
+			const color = element.querySelector("input[type=color]");
+			
+			if ((name) && (color)) {
+				options[name.value] = color.value;
+			}
+		}
+		
+		return options;
+	}
+	
+	function updateWheel(options) {
+		const wheel = document.querySelector("#wheel");
+		let content = "";
+		
+		const angle = 360 / Object.keys(options).length;
+		
+		let i = 0;
+		for(const [name, color] of Object.entries(options)) {
+			const start = (i * angle) + (angle / 2);
+			const end = start - angle;
+			const mid = start - (angle / 2);
+			const [start_x, start_y] = polarToCartesian(100, 100, 95, start);
+			const [mid_x, mid_y] = polarToCartesian(100, 100, 95, mid);
+			const [end_x, end_y] = polarToCartesian(100, 100, 95, end);
+			
+			content += `
+				<path d="M 100 100 L ${start_x} ${start_y} A 95 95 0 0 0 ${end_x} ${end_y} Z" stroke="${color}" fill="${color}"/>
+				<path id="p_${i}" d="M 100 100 L ${mid_x} ${mid_y}" fill="none" stroke="none"/>			
+				<text>
+					<textPath startOffset="90%" text-anchor="end" alignment-baseline="central" href="#p_${i}">
+						${name}
+					</textPath>
+				</text>
+			`;
+		
+			i++;
+		}
+		
+		wheel.innerHTML = content;
+	}
+	
+	function polarToCartesian(x, y, radius, angle) {
+		const angle_rad = angle * Math.PI / 180.0;
+		const dx = radius * Math.cos(angle_rad);
+		const dy = radius * Math.sin(angle_rad);
+		
+		return [x + dx, y + dy];
+	}
+	
+	</script>
+</head>
+<body onload="startup();">
+	
+	<div class="wrapper">
+
+		<div class="wheel_wrapper">
+			<svg style="z-index: -1;" id="wheel" viewbox="0 0 200 200"></svg>
+			<svg id="spinner" viewbox="0 0 200 200">
+				<circle cx="100" cy="100" r="2" fill="red"/>
+				<path d="M 190 100 L 200 95 L 200 105 Z" fill="red" stroke="red"/>
+			</svg>
+		<div>
+		
+		<hr />
+		<div id="options"></div>
+	
+		<hr />
+		<div>
+			<input id="new_name" type="text" />
+			<input id="new_color" type="color" />
+			<input id="add_new" type="button" value="Add" />
+		</div>
+	</div>
+	
+	<script type="text/javascript">
+				
+	</script>
+</body>
+</html>
