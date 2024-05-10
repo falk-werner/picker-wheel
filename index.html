@@ -83,6 +83,40 @@
 				update_frame(i, target_deg);
 			}, 10);
 		}
+		else {
+			drawToClipboard(target_deg);
+		}
+	}
+
+	async function drawToClipboard(target_deg) {
+		try {
+			const text = document.querySelector("#wheel");
+			const svg_url = `data:image/svg+xml;utf8,
+			<svg width="500" height="500" viewbox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+				<g transform="rotate(${target_deg} 100 100)">
+				${text.innerHTML.replaceAll("#", "%23")}
+				</g>
+
+				<circle cx="100" cy="100" r="2" fill="red"/>
+				<path d="M 190 100 L 200 95 L 200 105 Z" fill="red" stroke="red"/>
+			</svg>`;
+
+			const svg =  document.createElement("img");
+			svg.src = svg_url;
+			await svg.decode();
+			const canvas = document.createElement("canvas");
+			canvas.width = 500;
+			canvas.height = 500;
+			context = canvas.getContext("2d");
+			context.drawImage(svg, 0, 0, 200, 200, 0, 0, 500, 500);
+			const url = canvas.toDataURL("image/png");
+			const data = await fetch(url);
+			const blob = await data.blob();
+			await navigator.clipboard.write([new ClipboardItem({"image/png": blob})]);
+		}
+		catch (ex) {
+			console.error("failed to write clipboard");
+		}
 	}
 	
 	function addNewOption() {
